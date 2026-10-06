@@ -1,4 +1,4 @@
-NAME := FreeSign
+NAME := Odysseus
 SCHEME := Feather
 PLATFORMS := iphoneos maccatalyst
 
@@ -43,15 +43,15 @@ $(PLATFORMS): deps
 		ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=NO
 
 	mkdir -p _build/Payload
-	cp -R _build/Applications/*.app _build/Payload/FreeSign.app
-	chmod -R 0755 _build/Payload/FreeSign.app
-	codesign --force --sign - --timestamp=none _build/Payload/FreeSign.app
-	cp deps/* _build/Payload/FreeSign.app/ || true
+	cp -R _build/Applications/*.app _build/Payload/$(NAME).app
+	chmod -R 0755 _build/Payload/$(NAME).app
+	codesign --force --sign - --timestamp=none _build/Payload/$(NAME).app
+	cp deps/* _build/Payload/$(NAME).app/ || true
 
 	mkdir -p packages
 
 	@if [ "$@" = "iphoneos" ]; then \
-		ditto -c -k --sequesterRsrc --keepParent _build/Payload "packages/FreeSign.ipa"; \
+		ditto -c -k --sequesterRsrc --keepParent _build/Payload "packages/$(NAME).ipa"; \
 	else \
-		ditto -c -k --sequesterRsrc --keepParent _build/Payload/FreeSign.app "packages/FreeSign_Catalyst.zip"; \
+		ditto -c -k --sequesterRsrc --keepParent _build/Payload/$(NAME).app "packages/$(NAME)_Catalyst.zip"; \
 	fi

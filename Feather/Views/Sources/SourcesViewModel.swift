@@ -22,6 +22,10 @@ final class SourcesViewModel: ObservableObject {
 	@Published var sources: [AltSource: ASRepository] = [:]
 	
 	func fetchSources(_ sources: FetchedResults<AltSource>, refresh: Bool = false, batchSize: Int = 4) async {
+		await fetchSources(Array(sources), refresh: refresh, batchSize: batchSize)
+	}
+	
+	func fetchSources(_ sources: [AltSource], refresh: Bool = false, batchSize: Int = 4) async {
 		guard isFinished else { return }
 		
 		// check if sources to be fetched are the same as before, if yes, return
@@ -33,7 +37,10 @@ final class SourcesViewModel: ObservableObject {
 		defer { isFinished = true }
 		
 		await MainActor.run {
-			self.sources = [:]
+			// Odysseus: keep showing the old catalog while refreshing,
+			// only drop sources that were removed.
+			let wanted = Set(sources.map(\.objectID))
+			self.sources = self.sources.filter { wanted.contains($0.key.objectID) }
 		}
 		
 		let sourcesArray = Array(sources)
@@ -84,6 +91,7 @@ final class SourcesViewModel: ObservableObject {
 					source.iconURL = repo.currentIconURL ?? source.iconURL
 				}
 				Storage.shared.saveContext()
+				UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: ODPrefs.sourcesLastRefresh)
 				self._showFetchFailureToast(for: batchResults.failures)
 			}
 		}

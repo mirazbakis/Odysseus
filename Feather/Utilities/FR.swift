@@ -44,11 +44,13 @@ enum FR {
 		using options: Options,
 		icon: UIImage?,
 		certificate: CertificatePair?,
+		identityOverride: ODSigningOverride? = nil,
 		completion: @escaping (Error?, String?) -> Void
 	) {
 		Task.detached {
 			let handler = SigningHandler(app: app, options: options)
 			handler.appCertificate = certificate
+			handler.signingOverride = identityOverride
 			handler.appIcon = icon
 
 			do {

@@ -1,0 +1,75 @@
+name: Build
+
+# Builds an unsigned Odysseus.ipa on every push and on demand.
+# Pushing a tag like v1.0.0 also makes a draft GitHub release.
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Select Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+          echo "Using $XCODE"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/Odysseus/iphoneos/SourcePackages
+          key: spm-${{ hashFiles('**/Package.resolved', '**/Package.swift') }}
+          restore-keys: spm-
+
+      - name: Build Odysseus.ipa
+        env:
+          TMPDIR: ${{ runner.temp }}/
+        run: |
+          set -o pipefail
+          agvtool new-version -all ${{ github.run_number }}
+          if command -v xcbeautify >/dev/null; then
+            make iphoneos 2>&1 | tee build.log | xcbeautify --renderer github-actions
+          else
+            make iphoneos 2>&1 | tee build.log
+          fi
+          test -f packages/Odysseus.ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Odysseus-${{ github.sha }}
+          path: packages/Odysseus.ipa
+          if-no-files-found: error
+
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+
+      - name: Draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Odysseus ${{ github.ref_name }}
+          files: packages/Odysseus.ipa
+          draft: true
+          generate_release_notes: true

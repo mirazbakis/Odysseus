@@ -32,10 +32,13 @@ extension Storage {
 		new.expiration = expiration
 		new.nickname = nickname
 		new.isDefault = isDefault
-		if checksRevocation {
-			Storage.shared.revokagedCertificate(for: new)
-		}
 		saveContext()
+		if checksRevocation {
+			Task { @MainActor in
+				await ODCertificateStatusStore.shared.check(new)
+				ODExpiryReminderScheduler.reschedule()
+			}
+		}
 		generator?.impactOccurred()
 		completion(nil)
 	}
@@ -62,20 +65,10 @@ extension Storage {
 		return results[index]
 	}
 	
+	/// Odysseus: kept for older call sites; runs a real OCSP check.
 	func revokagedCertificate(for cert: CertificatePair) {
-		guard !cert.revoked else { return }
-		
-		Zsign.checkRevokage(
-			provisionPath: Storage.shared.getFile(.provision, from: cert)?.path ?? "",
-			p12Path: Storage.shared.getFile(.certificate, from: cert)?.path ?? "",
-			p12Password: cert.password ?? ""
-		) { (status, _, _) in
-			if status == 1 {
-				DispatchQueue.main.async {
-					cert.revoked = true
-					self.saveContext()
-				}
-			}
+		Task { @MainActor in
+			await ODCertificateStatusStore.shared.check(cert)
 		}
 	}
 	
@@ -148,15 +141,5 @@ extension Storage {
 		}
 
 		return nil
-	}
-	
-	func deleteDefaultCertificates() {
-		let certificates = getAllCertificates().filter { $0.isDefault }
-		
-		for certificate in certificates {
-			deleteCertificate(for: certificate)
-		}
-		
-		UserDefaults.standard.set(0, forKey: "feather.selectedCert")
 	}
 }

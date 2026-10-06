@@ -21,8 +21,15 @@ extension AboutView {
 // MARK: - View
 struct AboutView: View {
 	@State private var _credits: [CreditsModel] = [
-		.init(name: "Frizzle", desc: "Developer", github: "Frizzle"),
+		.init(name: "mbakis", desc: "Odysseus", github: "mirazbakis"),
+		.init(name: "Samara", desc: "Feather (original app)", github: "khcrysalis"),
+		.init(name: "Frizzle", desc: "FreeSign", github: "FrizzleM"),
+		.init(name: "SideStore", desc: "SideSign (Apple ID signing, AGPL-3.0)", github: "SideStore"),
+		.init(name: "Magesh K", desc: "SideSign, CodeSignKit, AnisetteKit", github: "mahee96"),
+		.init(name: "zhlynn", desc: "zsign", github: "zhlynn"),
+		.init(name: "jkcoxson", desc: "idevice", github: "jkcoxson"),
 		.init(name: "Lakhan Lothiyi", desc: "AltStore Repositories", github: "llsc12"),
+		.init(name: "LiveContainer", desc: "Mach-O patches", github: "LiveContainer"),
 	]
 	
 	// MARK: Body
@@ -47,6 +54,12 @@ struct AboutView: View {
 			}
 			.frame(maxWidth: .infinity)
 			.listRowBackground(EmptyView())
+			
+			Section {
+				Text(verbatim: "An app by mbakis. Odysseus is based on Feather by Samara and FreeSign by Frizzle, and is licensed under the GPL-3.0. Apple ID signing uses SideSign from SideStore, licensed under the AGPL-3.0. Source code: github.com/mirazbakis/Odysseus")
+					.font(.footnote)
+					.foregroundStyle(.secondary)
+			}
 			
 			NBSection(.localized("Credits")) {
 				ForEach(_credits, id: \.github) { credit in

@@ -1,14 +1,13 @@
 //
 //  FeatherApp.swift
-//  Feather
-//
-//  Created by samara on 10.04.2025.
+//  Odysseus (based on Feather by samara, 10.04.2025)
 //
 
 import SwiftUI
 import Nuke
 import IDeviceSwift
 import OSLog
+import AltSourceKit
 
 @main
 struct FeatherApp: App {
@@ -18,85 +17,61 @@ struct FeatherApp: App {
 	
 	@StateObject var downloadManager = DownloadManager.shared
 	@StateObject private var _sourceFetchErrorToast = SourceFetchErrorToastCenter.shared
-	@State private var _certificateSetupState: FSWelcomeView.SetupState? = DefaultCertificateInstaller.needsInstall ? .loading : nil
+	@Environment(\.scenePhase) private var _scenePhase
+	@AppStorage("Feather.userTintColor") private var _tintHex: String = "#B8CCF0"
 	let storage = Storage.shared
 
 	var body: some Scene {
 		WindowGroup {
-			Group {
-				if let setupState = _certificateSetupState {
-					FSWelcomeView(
-						state: setupState,
-						retry: {
-							_certificateSetupState = .loading
-						},
-						continueWithoutCertificates: {
-							_certificateSetupState = nil
-						}
-					)
-					.task(id: setupState) {
-						await _runCertificateSetupIfNeeded()
+			ODRootView()
+				.environment(\.managedObjectContext, storage.context)
+				.tint(Color(hex: _tintHex))
+				.animation(.smooth, value: downloadManager.manualDownloads.description)
+				.overlay(alignment: .bottom) {
+					if let message = _sourceFetchErrorToast.message {
+						SourceFetchErrorToastView(
+							message: message,
+							systemImage: _sourceFetchErrorToast.systemImage
+						)
+						.padding(.bottom, 120)
 					}
-				} else {
-					_mainContent
-						.transition(.move(edge: .top).combined(with: .opacity))
 				}
-			}
-			.environment(\.managedObjectContext, storage.context)
-			.animation(.smooth, value: downloadManager.manualDownloads.description)
-			.overlay(alignment: .bottom) {
-				if let message = _sourceFetchErrorToast.message {
-					SourceFetchErrorToastView(
-						message: message,
-						systemImage: _sourceFetchErrorToast.systemImage
-					)
-						.padding(.bottom, 82)
+				.animation(.spring(response: 0.28, dampingFraction: 0.9), value: _sourceFetchErrorToast.message)
+				.onOpenURL(perform: _handleURL)
+				.onReceive(NotificationCenter.default.publisher(for: .heartbeatInvalidHost)) { _ in
+					DispatchQueue.main.async {
+						UIAlertController.showAlertWithOk(
+							title: "InvalidHostID",
+							message: .localized("Your pairing file is invalid and is incompatible with your device, please import a valid pairing file.")
+						)
+					}
 				}
-			}
-			.animation(.spring(response: 0.28, dampingFraction: 0.9), value: _sourceFetchErrorToast.message)
-			.onOpenURL(perform: _handleURL)
-			.onReceive(NotificationCenter.default.publisher(for: .heartbeatInvalidHost)) { _ in
-				DispatchQueue.main.async {
-					UIAlertController.showAlertWithOk(
-						title: "InvalidHostID",
-						message: .localized("Your pairing file is invalid and is incompatible with your device, please import a valid pairing file.")
-					)
+				.onAppear {
+					let window = UIApplication.topViewController()?.view.window
+					if let style = UIUserInterfaceStyle(rawValue: UserDefaults.standard.integer(forKey: ODPrefs.interfaceStyle)) {
+						window?.overrideUserInterfaceStyle = style
+					}
+					window?.tintColor = UIColor(Color(hex: UserDefaults.standard.string(forKey: ODPrefs.tintColor) ?? ODTheme.moonlightHex))
 				}
-			}
-			// dear god help me
-			.onAppear {
-				if let style = UIUserInterfaceStyle(rawValue: UserDefaults.standard.integer(forKey: "Feather.userInterfaceStyle")) {
-					UIApplication.topViewController()?.view.window?.overrideUserInterfaceStyle = style
+				.onChange(of: _scenePhase) { phase in
+					guard phase == .active else { return }
+					Task { @MainActor in
+						await ODCertificateStatusStore.shared.checkAllIfNeeded()
+						await ODCatalogStore.shared.refreshIfNeeded()
+					}
 				}
-				
-				UIApplication.topViewController()?.view.window?.tintColor = UIColor(Color(hex: UserDefaults.standard.string(forKey: "Feather.userTintColor") ?? "#004CFF"))
-			}
 		}
 	}
 	
 	private func _handleURL(_ url: URL) {
-		if url.scheme == "freesign" {
-			/// freesign://select-certificate?cert=<nickname|uuid|profile-name|profile-uuid|team-name|index>
-			/// freesign://switch-certificate?cert=<nickname|uuid|profile-name|profile-uuid|team-name|index>
+		if url.scheme == "odysseus" {
+			/// odysseus://select-certificate?cert=<nickname|uuid|profile-name|profile-uuid|team-name|index>
+			/// odysseus://switch-certificate?cert=<nickname|uuid|profile-name|profile-uuid|team-name|index>
 			if url.host == "select-certificate" || url.host == "switch-certificate" {
 				_handleCertificateSelectionURL(url)
 				return
 			}
-			/// freesign://shortcut?input=InstallDNS
-			/// The "BreakFree" helper shortcut reopens us here once it has
-			/// finished preparing the device, so we resume the pending
-			/// install (see PostSigningShortcutCoordinator).
-			if url.host == "shortcut" {
-				let input = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-					.queryItems?
-					.first(where: { $0.name == "input" })?
-					.value
-				if input == "InstallDNS" {
-					PostSigningShortcutCoordinator.resumePendingInstall()
-				}
-				return
-			}
-			/// freesign://import-certificate?p12=<base64>&mobileprovision=<base64>&password=<base64>
+			/// odysseus://import-certificate?p12=<base64>&mobileprovision=<base64>&password=<base64>
 			if url.host == "import-certificate" {
 				guard
 					let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
@@ -145,7 +120,7 @@ struct FeatherApp: App {
 				
 				return
 			}
-			/// freesign://export-certificate?callback_template=<template>
+			/// odysseus://export-certificate?callback_template=<template>
 			/// ?callback_template=: This is how we callback to the application requesting the certificate, this will be a url scheme
 			/// 	example: livecontainer%3A%2F%2Fcertificate%3Fcert%3D%24%28BASE64_CERT%29%26password%3D%24%28PASSWORD%29
 			/// 	decoded: livecontainer://certificate?cert=$(BASE64_CERT)&password=$(PASSWORD)
@@ -162,11 +137,11 @@ struct FeatherApp: App {
 				
 				FR.exportCertificateAndOpenUrl(using: callbackTemplate)
 			}
-			/// freesign://source/<url>
+			/// odysseus://source/<url>
 			if let fullPath = url.validatedScheme(after: "/source/") {
 				FR.handleSource(fullPath) { }
 			}
-			/// freesign://install/<url.ipa>
+			/// odysseus://install/<url.ipa>
 			if
 				let fullPath = url.validatedScheme(after: "/install/"),
 				let downloadURL = URL(string: fullPath)
@@ -232,34 +207,12 @@ struct FeatherApp: App {
 	}
 }
 
-// MARK: - View extension
-extension FeatherApp {
-	@ViewBuilder
-	private var _mainContent: some View {
-		FSRootView()
-	}
-	
-	@MainActor
-	private func _runCertificateSetupIfNeeded() async {
-		guard _certificateSetupState == .loading else {
-			return
-		}
-		
-		do {
-			_ = try await DefaultCertificateInstaller.shared.installIfNeeded()
-			_certificateSetupState = nil
-		} catch {
-			_certificateSetupState = .failed(error.localizedDescription)
-		}
-	}
-}
-
 class AppDelegate: NSObject, UIApplicationDelegate {
 	func application(
 		_ application: UIApplication,
 		didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
 	) -> Bool {
-		_configureFreeSignDefaults()
+		ODPrefs.registerDefaults()
 		_createPipeline()
 		_createDocumentsDirectories()
 		ResetView.clearWorkCache()
@@ -281,17 +234,16 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 		
 		if insertedCount > 0 {
 			SourceFetchErrorToastCenter.shared.show(
-				.localized("Succesfully added %d sources", arguments: insertedCount),
+				.localized("Added %d sources", arguments: insertedCount),
 				systemImage: "checkmark.circle.fill"
 			)
 		}
+		
+		await ODCatalogStore.shared.load()
+		ODExpiryReminderScheduler.reschedule()
+		await ODCertificateStatusStore.shared.checkAllIfNeeded()
 	}
 
-	private func _configureFreeSignDefaults() {
-		UserDefaults.standard.set(0, forKey: "Feather.installationMethod")
-		UserDefaults.standard.set(1, forKey: "Feather.serverMethod")
-	}
-	
 	private func _createPipeline() {
 		DataLoader.sharedUrlCache.diskCapacity = 0
 		
@@ -301,7 +253,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 				config.urlCache = nil
 				return DataLoader(configuration: config)
 			}()
-			let dataCache = try? DataCache(name: "frizzle.FreeSign.datacache") // disk cache
+			let dataCache = try? DataCache(name: "com.mirazbakis.Odysseus.datacache") // disk cache
 			let imageCache = Nuke.ImageCache() // memory cache
 			dataCache?.sizeLimit = 500 * 1024 * 1024
 			imageCache.costLimit = 100 * 1024 * 1024

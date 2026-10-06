@@ -121,10 +121,8 @@ extension CertificatesView {
 			)
 			.contextMenu {
 				_contextActions(for: cert)
-				if cert.isDefault != true {
-					Divider()
-					_actions(for: cert)
-				}
+				Divider()
+				_actions(for: cert)
 			}
 			.transaction {
 				$0.animation = nil
@@ -136,6 +134,7 @@ extension CertificatesView {
 	@ViewBuilder
 	private func _actions(for cert: CertificatePair) -> some View {
 		Button(.localized("Delete"), systemImage: "trash", role: .destructive) {
+			ODCertificateStatusStore.shared.remove(cert)
 			Storage.shared.deleteCertificate(for: cert)
 		}
 	}
@@ -151,8 +150,8 @@ extension CertificatesView {
 			_isRenamingPresenting = true
 		}
 		Divider()
-		Button(.localized("Check Revokage"), systemImage: "person.text.rectangle") {
-			Storage.shared.revokagedCertificate(for: cert)
+		Button(.localized("Check Revocation Now"), systemImage: "checkmark.shield") {
+			Task { await ODCertificateStatusStore.shared.check(cert) }
 		}
 	}
 }

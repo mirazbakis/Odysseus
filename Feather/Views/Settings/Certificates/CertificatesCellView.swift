@@ -13,6 +13,7 @@ struct CertificatesCellView: View {
 	@State var data: Certificate?
 	
 	@ObservedObject var cert: CertificatePair
+	@ObservedObject private var _statusStore = ODCertificateStatusStore.shared
 	
 	// MARK: Body
 	var body: some View {
@@ -71,15 +72,23 @@ extension CertificatesCellView {
 			pills.append(NBPillItem(title: .localized("PPQCheck"), icon: "checkmark.shield", color: .red))
 		}
 		
-		if cert.revoked == true {
-			pills.append(NBPillItem(title: .localized("Revoked"), icon: "xmark.octagon", color: .red))
+		// Odysseus: live OCSP status instead of the one-way revoked flag.
+		if let result = _statusStore.result(for: cert) {
+			pills.append(NBPillItem(
+				title: result.title,
+				icon: result.icon,
+				color: ODOCSPPill.color(for: result.status)
+			))
 		}
 		
-		if let info = cert.expiration?.expirationInfo() {
+		if let expiration = cert.expiration, _statusStore.result(for: cert)?.status != .revoked {
+			let info = expiration.expirationInfo()
+			let warningDays = UserDefaults.standard.integer(forKey: ODPrefs.expiryWarningDays)
+			let isWarning = expiration.timeIntervalSinceNow < Double(max(warningDays, 1)) * 86_400
 			pills.append(NBPillItem(
-				title: info.formatted,
-				icon: info.icon,
-				color: info.color
+				title: expiration.timeIntervalSinceNow <= 0 ? .localized("Expired") : info.formatted,
+				icon: "clock.fill",
+				color: isWarning ? ODTheme.revoked : ODTheme.valid
 			))
 		}
 		
