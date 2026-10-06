@@ -54,6 +54,8 @@ enum ODPrefs {
 			combineDuplicates: true,
 			discoverRowOrder: DiscoverRow.defaultOrder.map(\.rawValue).joined(separator: ","),
 			tintColor: ODTheme.moonlightHex,
+			// Semi-local server: works without the entitlements fully local needs.
+			"Feather.serverMethod": 1,
 			interfaceStyle: 2 // dark
 		])
 	}
