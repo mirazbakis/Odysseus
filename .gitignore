@@ -1,0 +1,9 @@
+.DS_Store
+packages
+Payload
+*UserInterfaceState.xcuserstate
+xcuserdata/
+deps
+cert.json
+_build
+build/
