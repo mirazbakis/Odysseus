@@ -2,11 +2,11 @@
 
 # Odysseus
 
-**An on-device app store and signer for iPhone and iPad.** An app by mbakis.
+**An on-device app store and signer for iOS.**
 
 Odysseus combines every app from your sources into one App Store-style catalog, signs apps on your device with your own certificate or your own Apple ID, and installs them. It is based on [Feather](https://github.com/khcrysalis/Feather) by Samara and [FreeSign](https://github.com/FrizzleM/FreeSign) by Frizzle.
 
-Bundle ID: `com.mirazbakis.Odysseus` · Requires iOS 16 or later (Liquid Glass on iOS 26).
+Requires iOS 16 or later, for liquid glass you need iOS 26.
 
 ## Features
 
@@ -20,19 +20,6 @@ Bundle ID: `com.mirazbakis.Odysseus` · Requires iOS 16 or later (Liquid Glass o
 - **Tweaks** and app customisation from Feather.
 - **Settings**: default signing identity, bundle ID prefix/suffix, revocation check frequency, expiry reminders, source auto-refresh, combine duplicates, Discover row order and hidden sources, custom plist server, delete IPA after signing, theme and accent presets, clear cache, diagnostics and log export.
 
-## Certificates
-
-Odysseus **does not include any certificates** and never downloads shared ones. Import your own `.p12` + `.mobileprovision`, or sign in with your own Apple ID.
-
-## Default sources
-
-Edit [`Feather/Resources/DefaultSources.json`](Feather/Resources/DefaultSources.json):
-
-- `sources`: replace the `ADD_HERESOURCE` placeholders with source URLs. They are added on first launch.
-- `remoteList`: a URL to a plain-text list (one URL per line) or a JSON array. It is fetched on every launch and new sources are added.
-- `featured`: sources suggested in Add Source.
-
-Entries that still contain `ADD_HERE` are ignored.
 
 ## Building
 
