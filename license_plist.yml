@@ -3,7 +3,7 @@ options:
     - LICENSE
   packagePaths:
     - Package.swift
-  prefix: frizzle.FreeSign
+  prefix: com.mirazbakis.Odysseus
   xcworkspacePath: "*.xcworkspace"
   addVersionNumbers: false
   singlePage: false
@@ -20,6 +20,9 @@ manual:
     
   - name: "ElleKit"
     file: "LICENSE_EllEKIT"
+
+  - name: "SideSign (AGPL-3.0)"
+    file: "SideSign/LICENSE"
 
   - name: "LiveContainer"
     file: "Zsign/LICENSE_LC"

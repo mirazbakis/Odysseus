@@ -175,6 +175,11 @@ extension DownloadManager: URLSessionDownloadDelegate {
 				generator.notificationOccurred(.error)
 			}
 			
+			let id = dl.id
+			Task { @MainActor in
+				ODSignPipeline.shared.downloadEnded(id)
+			}
+			
 			DispatchQueue.main.async {
 				if let index = DownloadManager.shared.getDownloadIndex(by: dl.id) {
 					DownloadManager.shared.downloads.remove(at: index)
@@ -243,6 +248,10 @@ extension DownloadManager: URLSessionDownloadDelegate {
 		DispatchQueue.main.async {
 			if let index = self.getDownloadIndex(by: download.id) {
 				self.downloads.remove(at: index)
+			}
+			let id = download.id
+			Task { @MainActor in
+				ODSignPipeline.shared.downloadEnded(id)
 			}
 		}
 	}

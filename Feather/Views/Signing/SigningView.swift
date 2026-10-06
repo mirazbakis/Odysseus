@@ -20,6 +20,7 @@ struct SigningView: View {
 	@State private var _isFilePickerPresenting = false
 	@State private var _isImagePickerPresenting = false
 	@State private var _isSigning = false
+	@State private var _useAppleID = ODPrefs.signingIdentityKind == .appleID && ODAppleIDManager.shared.isSignedIn
 	@State private var _selectedPhoto: PhotosPickerItem? = nil
 	@State var appIcon: UIImage?
 	
@@ -192,7 +193,20 @@ extension SigningView {
 	@ViewBuilder
 	private func _cert() -> some View {
 		NBSection(.localized("Signing")) {
-			if let cert = _selectedCert() {
+			if ODAppleIDManager.shared.isSignedIn {
+				Picker(.localized("Sign With"), selection: $_useAppleID) {
+					Text(.localized("Certificate")).tag(false)
+					Text(.localized("Apple ID")).tag(true)
+				}
+				.pickerStyle(.segmented)
+			}
+			
+			if _useAppleID {
+				LabeledContent(.localized("Apple ID"), value: ODAppleIDManager.shared.account?.appleID ?? "")
+				Text(.localized("A 7-day profile is made for this app on your Apple ID. App extensions are removed unless you turn that off in Settings → Apple ID."))
+					.font(.footnote)
+					.foregroundStyle(.secondary)
+			} else if let cert = _selectedCert() {
 				NavigationLink {
 					CertificatesView(selectedCert: $_temporaryCertificate)
 				} label: {
@@ -265,48 +279,42 @@ extension SigningView {
 extension SigningView {
 	private func _start() {
 		guard
-			_selectedCert() != nil || _temporaryOptions.signingOption != .default
+			_useAppleID || _selectedCert() != nil || _temporaryOptions.signingOption != .default
 		else {
 			UIAlertController.showAlertWithOk(
 				title: .localized("No Certificate"),
-				message: .localized("Please go to settings and import a valid certificate"),
+				message: .localized("Import a certificate in Library, or sign in with your Apple ID in Settings."),
 				isCancel: true
 			)
 			return
 		}
-
+		
 		let generator = UIImpactFeedbackGenerator(style: .light)
 		generator.impactOccurred()
 		_isSigning = true
 		
-		FR.signPackageFile(
-			app,
-			using: _temporaryOptions,
-			icon: appIcon,
-			certificate: _selectedCert()
-		) { error, signedAppUUID in
-			if let error {
-				let ok = UIAlertAction(title: .localized("Dismiss"), style: .cancel) { _ in
-					dismiss()
+		let identity: ODSigningIdentity = _useAppleID ? .appleID : .certificate(_selectedCert())
+		let options = _temporaryOptions
+		let icon = appIcon
+		
+		Task { @MainActor in
+			do {
+				let signedUUID = try await ODSignPipeline.shared.sign(app, options: options, icon: icon, identity: identity)
+				_isSigning = false
+				dismiss()
+				if options.post_installAppAfterSigned {
+					ODSignPipeline.shared.install(signedUUID: signedUUID)
 				}
-
+			} catch ODSignError.cancelled {
+				_isSigning = false
+			} catch {
+				_isSigning = false
+				let ok = UIAlertAction(title: .localized("Dismiss"), style: .cancel)
 				UIAlertController.showAlert(
-					title: "Error",
+					title: .localized("Couldn't sign"),
 					message: error.localizedDescription,
 					actions: [ok]
 				)
-			} else {
-				if
-					_temporaryOptions.post_deleteAppAfterSigned,
-					!app.isSigned
-				{
-					Storage.shared.deleteApp(for: app)
-				}
-
-				if _temporaryOptions.post_installAppAfterSigned {
-					PostSigningShortcutCoordinator.beginPendingInstall(for: signedAppUUID)
-				}
-				dismiss()
 			}
 		}
 	}

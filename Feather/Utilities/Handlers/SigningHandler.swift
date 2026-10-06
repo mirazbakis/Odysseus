@@ -28,6 +28,9 @@ final class SigningHandler: NSObject {
 	// throw an error
 	var appIcon: UIImage?
 	var appCertificate: CertificatePair?
+	/// Odysseus: sign with these files instead of `appCertificate`
+	/// (used for Apple ID signing, where the profile is made per app).
+	var signingOverride: ODSigningOverride?
 
 	/// UUID of the Signed record this handler creates, so callers can
 	/// locate the freshly-signed app once `addToDatabase` has run.
@@ -107,12 +110,12 @@ final class SigningHandler: NSObject {
 		// iOS "26" (19) needs special treatment
 		try await _locateMachosAndFixupArm64eSlice(for: movedAppPath)
 		
-		let handler = ZsignHandler(appUrl: movedAppPath, options: _options, cert: appCertificate)
+		let handler = ZsignHandler(appUrl: movedAppPath, options: _options, cert: appCertificate, identityOverride: signingOverride)
 		try await handler.disinject()
 		
 		if
 			_options.signingOption == .default,
-			appCertificate != nil
+			appCertificate != nil || signingOverride != nil
 		{
 			try await handler.sign()
 //		} else if _options.signingOption == .adhoc {
@@ -160,7 +163,7 @@ final class SigningHandler: NSObject {
 			
 			Storage.shared.addSigned(
 				uuid: _uuid,
-				certificate: _options.signingOption != .default ? nil : appCertificate,
+				certificate: (_options.signingOption != .default || signingOverride != nil) ? nil : appCertificate,
 				appName: bundle?.name,
 				appIdentifier: bundle?.bundleIdentifier,
 				appVersion: bundle?.version,

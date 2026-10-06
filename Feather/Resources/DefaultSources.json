@@ -1,0 +1,17 @@
+{
+  "_comment": "Odysseus default sources. Replace the placeholders with real URLs. Entries that still contain ADD_HERE are ignored. remoteList points to a plain-text file (one source URL per line, # for comments) or a JSON array of URLs; it is fetched on every launch and new sources are added.",
+  "remoteList": "ADD_HERE_REMOTE_LIST_URL",
+  "sources": [
+    "ADD_HERESOURCE",
+    "ADD_HERESOURCE",
+    "ADD_HERESOURCE",
+    "ADD_HERESOURCE",
+    "ADD_HERESOURCE",
+    "ADD_HERESOURCE",
+    "ADD_HERESOURCE",
+    "ADD_HERESOURCE",
+    "ADD_HERESOURCE",
+    "ADD_HERESOURCE"
+  ],
+  "featured": []
+}

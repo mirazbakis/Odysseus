@@ -124,6 +124,21 @@ final class AppFileHandler: NSObject, @unchecked Sendable {
 		) { _ in
 			Logger.misc.info("[\(self._uuid)] Added to database")
 		}
+		
+		// Odysseus: lets the one-tap Get flow pick up the imported app.
+		let uuid = _uuid
+		var userInfo: [String: Any] = ["remote": !(_download?.onlyArchiving ?? true)]
+		if let downloadID = _download?.id {
+			userInfo["downloadID"] = downloadID
+		}
+		let info = userInfo
+		await MainActor.run {
+			NotificationCenter.default.post(
+				name: .odysseusDidImportApp,
+				object: uuid,
+				userInfo: info
+			)
+		}
 	}
 	
 	private func _directory() async throws -> URL {
@@ -134,6 +149,12 @@ final class AppFileHandler: NSObject, @unchecked Sendable {
 	func clean() async throws {
 		try _fileManager.removeFileIfNeeded(at: _uniqueWorkDir)
 	}
+}
+
+extension Notification.Name {
+	/// object: imported app UUID (String); userInfo["downloadID"]: the Download id, if any;
+	/// userInfo["remote"]: true when it was downloaded rather than picked from Files.
+	static let odysseusDidImportApp = Notification.Name("Odysseus.didImportApp")
 }
 
 private enum ImportedFileHandlerError: Error {
