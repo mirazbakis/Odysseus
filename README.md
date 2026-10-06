@@ -37,7 +37,7 @@ The Xcode project and target are still called `Feather` internally; the product 
 
 ## License
 
-Odysseus is free software under the **GPL-3.0** (see [LICENSE](LICENSE)), like Feather and FreeSign.
+Odysseus is free software under the **GPL-3.0** (see [LICENSE](LICENSE)), like Feather and FreeSign..
 
 Apple ID signing uses **SideSign** from SideStore / Catalyst, vendored in [`SideSign/`](SideSign) under the **AGPL-3.0** ([SideSign/LICENSE](SideSign/LICENSE)), with its dependencies CodeSignKit, GSACryptoKit and AnisetteKit. GPL-3.0 section 13 allows combining with AGPL-3.0 code; the SideSign parts stay under the AGPL-3.0.
 
