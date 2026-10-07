@@ -23,7 +23,7 @@ Requires iOS 16 or later, for liquid glass you need iOS 26.
 
 ## Building
 
-GitHub Actions builds an unsigned `Odysseus.ipa` on every push (`.github/workflows/build.yml`). Pushing a tag like `v1.0.0` also makes a draft release.
+GitHub Actions builds an unsigned `Odysseus.ipa` on every push (`.github/workflows/build.yml`). Pushes to `master` update the **nightly** prerelease on the Releases page; pushing a tag like `v1.0.0` publishes a normal release.
 
 Locally (macOS with Xcode 26):
 
