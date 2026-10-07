@@ -6,7 +6,7 @@
 
 Odysseus combines every app from your sources into one App Store-style catalog, signs apps on your device with your own certificate or your own Apple ID, and installs them. It is based on [Feather](https://github.com/khcrysalis/Feather) by Samara and [FreeSign](https://github.com/FrizzleM/FreeSign) by Frizzle.
 
-Requires iOS 16 or later, for liquid glass you need iOS 26.
+Requires iOS 17 or later, for liquid glass you need iOS 26.
 
 ## Features
 
