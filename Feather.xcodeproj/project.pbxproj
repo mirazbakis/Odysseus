@@ -549,7 +549,7 @@
 			repositoryURL = "https://github.com/vapor/vapor";
 			requirement = {
 				kind = exactVersion;
-				version = 4.104.0;
+				version = 4.121.4;
 			};
 		};
 		3346F8372DC6C68300C7D508 /* XCRemoteSwiftPackageReference "Nuke" */ = {
