@@ -1,12 +1,17 @@
-name: Build
+name: Build Odysseus
 
-# Builds an unsigned Odysseus.ipa on every push and on demand.
-# Pushing a tag like v1.0.0 also makes a draft GitHub release.
+# Builds an unsigned Odysseus.ipa.
+# - Every push to master refreshes the "nightly" prerelease on GitHub Releases.
+# - Pushing a tag like v1.0.0 publishes a normal release with the .ipa.
+# - Pull requests and manual runs only upload the .ipa as a workflow artifact.
 
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*' ]
+    branches: [master, main]
+    tags: ['v*']
+    paths-ignore:
+      - 'app-repo.json'
+      - '**.md'
   pull_request:
   workflow_dispatch:
 
@@ -14,49 +19,55 @@ concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   build:
-    runs-on: macos-latest
+    name: Build unsigned Odysseus.ipa
+    runs-on: macos-26
     timeout-minutes: 60
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Select Xcode
-        run: |
-          XCODE=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
-          echo "Using $XCODE"
-          sudo xcode-select -s "$XCODE"
-          xcodebuild -version
+      - run: brew install xcbeautify || true
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1.6.0
+        with:
+          xcode-version: "26.4"
 
       - name: Cache Swift packages
         uses: actions/cache@v4
         with:
-          path: ${{ runner.temp }}/Odysseus/iphoneos/SourcePackages
-          key: spm-${{ hashFiles('**/Package.resolved', '**/Package.swift') }}
-          restore-keys: spm-
+          path: |
+            ${{ runner.temp }}/Odysseus/iphoneos/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm
+          key: odysseus-${{ runner.os }}-${{ hashFiles('**/Package.resolved', '**/Package.swift') }}
+          restore-keys: odysseus-${{ runner.os }}-
 
-      - name: Build Odysseus.ipa
+      - name: Version
+        run: |
+          BASE=$(grep -E '^FEATHER_PROJECT_VERSION' Feather.xcconfig | cut -d= -f2 | tr -d ' ')
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="${BASE}-nightly.${{ github.run_number }}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "SHORT_COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          sed -i '' "s/^FEATHER_PROJECT_VERSION=.*/FEATHER_PROJECT_VERSION=${VERSION}/" Feather.xcconfig
+          agvtool new-version -all ${{ github.run_number }}
+
+      - name: Build
         env:
           TMPDIR: ${{ runner.temp }}/
         run: |
           set -o pipefail
-          agvtool new-version -all ${{ github.run_number }}
-          if command -v xcbeautify >/dev/null; then
-            make iphoneos 2>&1 | tee build.log | xcbeautify --renderer github-actions
-          else
-            make iphoneos 2>&1 | tee build.log
-          fi
+          make iphoneos 2>&1 | tee build.log | xcbeautify --renderer github-actions
           test -f packages/Odysseus.ipa
-
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: Odysseus-${{ github.sha }}
-          path: packages/Odysseus.ipa
-          if-no-files-found: error
 
       - name: Upload build log
         if: failure()
@@ -65,11 +76,32 @@ jobs:
           name: build-log
           path: build.log
 
-      - name: Draft release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+      - uses: actions/upload-artifact@v4
         with:
-          name: Odysseus ${{ github.ref_name }}
-          files: packages/Odysseus.ipa
-          draft: true
-          generate_release_notes: true
+          name: Odysseus-${{ env.VERSION }}
+          path: packages/Odysseus.ipa
+          retention-days: 90
+
+      - name: Publish nightly
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag -f nightly
+          git push -f origin nightly
+          if gh release view nightly >/dev/null 2>&1; then
+            gh release upload nightly packages/Odysseus.ipa --clobber
+            gh release edit nightly --prerelease --title "Odysseus Nightly (${SHORT_COMMIT})"
+          else
+            gh release create nightly packages/Odysseus.ipa --prerelease \
+              --title "Odysseus Nightly (${SHORT_COMMIT})" \
+              --notes "Automatic unsigned build from the latest commit on master."
+          fi
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" packages/Odysseus.ipa \
+            --title "Odysseus $GITHUB_REF_NAME" --generate-notes
