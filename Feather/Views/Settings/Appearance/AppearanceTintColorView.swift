@@ -20,18 +20,6 @@ struct AppearanceTintColorView: View {
 		("Sirens", 			"#62D2C4"),
 		("Ember", 			"#F08A5D"),
 		("Pearl", 			"#E8E8EE")
-	] = [
-		("Default", 		"#B8CCF0"),
-		("V2", 				"#B496DC"),
-		("Berry",   		"#ff7a83"),
-		("Cool Blue", 		"#4161F1"),
-		("Fuchsia", 		"#FF00FF"),
-		("Protokolle", 		"#4CD964"),
-		("Aidoku", 			"#FF2D55"),
-		("Clock", 			"#FF9500"),
-		("Peculiar", 		"#4860e8"),
-		("Very Peculiar", 	"#5394F7"),
-		("Emily",			"#e18aab")
 	]
 	// MARK: Body
 	var body: some View {
