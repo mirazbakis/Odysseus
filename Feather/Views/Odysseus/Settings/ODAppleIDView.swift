@@ -18,7 +18,9 @@ struct ODAppleIDView: View {
 	@AppStorage(ODPrefs.appleIDAppendTeamID) private var _appendTeamID = true
 	@AppStorage(ODPrefs.appleIDRemoveExtensions) private var _removeExtensions = true
 	@AppStorage(ODAppleIDManager.manualUDIDKey) private var _manualUDID = ""
-	@AppStorage(ODAppleIDManager.anisetteServersKey) private var _anisetteServers = ODAppleIDManager.defaultAnisetteServer
+	@AppStorage(ODAnisetteServers.choiceKey) private var _anisetteChoice = ODAnisetteServers.automatic
+	@ObservedObject private var _anisette = ODAnisetteServers.shared
+	@State private var _isAnisetteResetDone = false
 
 	@State private var _isSigningIn = false
 	@State private var _isExportWarningPresented = false
@@ -98,7 +100,7 @@ struct ODAppleIDView: View {
 					.foregroundStyle(Color.accentColor)
 				Text(.localized("Use your own Apple ID"))
 					.font(.system(.title3, design: .rounded).weight(.bold))
-					.foregroundStyle(.white)
+					.foregroundStyle(.primary)
 				Text(.localized("Odysseus makes a development certificate on your Apple ID and signs apps for this device with it. Free Apple IDs: apps last 7 days, up to 3 at a time, 10 new App IDs a week."))
 					.font(.subheadline)
 					.foregroundStyle(.secondary)
@@ -250,6 +252,13 @@ struct ODAppleIDView: View {
 	private var _deviceSection: some View {
 		Section {
 			LabeledContent(.localized("UDID"), value: _manager.deviceUDID ?? String.localized("Not found"))
+			if ODPairingController.isSupported {
+				NavigationLink {
+					ODPairDeviceView()
+				} label: {
+					Label(.localized("Get UDID by Pairing"), systemImage: "link")
+				}
+			}
 			TextField(.localized("Enter UDID manually"), text: $_manualUDID)
 				.textInputAutocapitalization(.characters)
 				.autocorrectionDisabled()
@@ -257,7 +266,7 @@ struct ODAppleIDView: View {
 		} header: {
 			Text(.localized("This Device"))
 		} footer: {
-			Text(.localized("Profiles only work on registered devices. Odysseus reads the UDID from your pairing file (Settings → Installation). Leave the field empty to use it."))
+			Text(.localized("Profiles only work on registered devices. Odysseus gets the UDID by pairing with this device, or from your pairing file (Settings → Installation). Leave the field empty to use it."))
 		}
 		.listRowBackground(ODTheme.navy)
 	}
@@ -265,19 +274,29 @@ struct ODAppleIDView: View {
 	// MARK: Anisette
 	private var _anisetteSection: some View {
 		Section {
-			TextField(ODAppleIDManager.defaultAnisetteServer, text: $_anisetteServers, axis: .vertical)
-				.textInputAutocapitalization(.never)
-				.autocorrectionDisabled()
-				.keyboardType(.URL)
-			Button(.localized("Reset to Default")) {
-				_anisetteServers = ODAppleIDManager.defaultAnisetteServer
+			Picker(.localized("Server"), selection: $_anisetteChoice) {
+				Text(.localized("Automatic")).tag(ODAnisetteServers.automatic)
+				ForEach(_anisette.servers) { server in
+					Text(server.name).tag(server.address)
+				}
+			}
+			.pickerStyle(.navigationLink)
+			Button(.localized("Reset Anisette Data"), systemImage: "arrow.counterclockwise") {
+				_manager.resetAnisette()
+				_isAnisetteResetDone = true
+			}
+			.alert(.localized("Anisette data reset"), isPresented: $_isAnisetteResetDone) {
+				Button(.localized("OK"), role: .cancel) {}
+			} message: {
+				Text(.localized("Odysseus will make a new anisette identity the next time you sign in."))
 			}
 		} header: {
-			Text(.localized("Anisette Servers"))
+			Text(.localized("Anisette"))
 		} footer: {
-			Text(.localized("One URL per line. Odysseus tries them in order."))
+			Text(.localized("Automatic tries the servers that answer, Windows-ADI servers first, and moves on when Apple refuses one. If Apple keeps turning down the sign-in, reset anisette data and wait a few minutes."))
 		}
 		.listRowBackground(ODTheme.navy)
+		.task { await _anisette.refresh() }
 	}
 
 	// MARK: Actions

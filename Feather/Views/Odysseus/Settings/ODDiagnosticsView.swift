@@ -46,7 +46,7 @@ struct ODDiagnosticsView: View {
 			Section {
 				_reachability(.localized("Apple OCSP"), "http://ocsp.apple.com")
 				_reachability(.localized("Apple Developer"), "https://developerservices2.apple.com")
-				_reachability(.localized("Anisette Server"), _appleID.anisetteServers.first?.absoluteString ?? ODAppleIDManager.defaultAnisetteServer)
+				_reachability(.localized("Anisette Server"), ODAnisetteServers.builtIn[0].address)
 				Button(.localized("Run Checks"), systemImage: "bolt.horizontal") {
 					Task { await _runChecks() }
 				}
@@ -108,7 +108,7 @@ struct ODDiagnosticsView: View {
 		let urls = [
 			"http://ocsp.apple.com",
 			"https://developerservices2.apple.com",
-			_appleID.anisetteServers.first?.absoluteString ?? ODAppleIDManager.defaultAnisetteServer
+			ODAnisetteServers.builtIn[0].address
 		]
 		for url in urls {
 			_checks[url] = .some(nil)

@@ -51,7 +51,7 @@ struct FeatherApp: App {
 					if let style = UIUserInterfaceStyle(rawValue: UserDefaults.standard.integer(forKey: ODPrefs.interfaceStyle)) {
 						window?.overrideUserInterfaceStyle = style
 					}
-					window?.tintColor = UIColor(Color(hex: UserDefaults.standard.string(forKey: ODPrefs.tintColor) ?? ODTheme.moonlightHex))
+					window?.tintColor = ODTheme.tintUIColor(hex: UserDefaults.standard.string(forKey: ODPrefs.tintColor) ?? ODTheme.moonlightHex)
 				}
 				.onChange(of: _scenePhase) { phase in
 					guard phase == .active else { return }

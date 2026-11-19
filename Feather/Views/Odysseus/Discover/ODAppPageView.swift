@@ -91,7 +91,7 @@ struct ODAppPageView: View {
 			VStack(alignment: .leading, spacing: 4) {
 				Text(_app.currentName)
 					.font(.system(.title2, design: .rounded).weight(.bold))
-					.foregroundStyle(.white)
+					.foregroundStyle(.primary)
 					.lineLimit(2)
 
 				Text(_app.developer ?? _offer.sourceName)
@@ -131,7 +131,7 @@ struct ODAppPageView: View {
 							VStack(alignment: .leading, spacing: 2) {
 								Text(offer.sourceName)
 									.font(.subheadline.weight(.semibold))
-									.foregroundStyle(.white)
+									.foregroundStyle(.primary)
 								Text(verbatim: [offer.app.currentVersion.map { "v\($0)" }, offer.app.currentDate.map { DateFormatter.localizedString(from: $0.date, dateStyle: .medium, timeStyle: .none) }]
 									.compactMap { $0 }
 									.joined(separator: " · "))
@@ -213,7 +213,7 @@ struct ODAppPageView: View {
 				}
 				Text(text)
 					.font(.subheadline)
-					.foregroundStyle(.white.opacity(0.92))
+					.foregroundStyle(.primary.opacity(0.85))
 			}
 			.frame(maxWidth: .infinity, alignment: .leading)
 			.odCard()
@@ -227,7 +227,7 @@ struct ODAppPageView: View {
 			VStack(alignment: .leading, spacing: 8) {
 				Text(text)
 					.font(.subheadline)
-					.foregroundStyle(.white.opacity(0.92))
+					.foregroundStyle(.primary.opacity(0.85))
 					.lineLimit(_isDescriptionExpanded ? nil : 5)
 				Button(_isDescriptionExpanded ? String.localized("Less") : String.localized("More")) {
 					withAnimation(.snappy) { _isDescriptionExpanded.toggle() }
@@ -249,7 +249,7 @@ struct ODAppPageView: View {
 						HStack {
 							Text(verbatim: version.version)
 								.font(.subheadline.weight(.semibold))
-								.foregroundStyle(.white)
+								.foregroundStyle(.primary)
 							Spacer()
 							if let date = version.date?.date {
 								Text(date, style: .date)
@@ -304,7 +304,7 @@ struct ODAppPageView: View {
 			Spacer(minLength: 16)
 			Text(value)
 				.font(.subheadline.weight(.medium))
-				.foregroundStyle(.white)
+				.foregroundStyle(.primary)
 				.multilineTextAlignment(.trailing)
 				.lineLimit(2)
 				.textSelection(.enabled)

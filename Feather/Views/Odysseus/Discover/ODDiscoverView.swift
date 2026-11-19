@@ -255,7 +255,7 @@ struct ODFeaturedCard: View {
 				VStack(alignment: .leading, spacing: 2) {
 					Text(entry.app.currentName)
 						.font(.system(.headline, design: .rounded).weight(.bold))
-						.foregroundStyle(.white)
+						.foregroundStyle(.primary)
 						.lineLimit(1)
 					Text(entry.app.currentDescription ?? entry.app.developer ?? "")
 						.font(.caption)
@@ -337,7 +337,7 @@ struct ODAppRow: View {
 					VStack(alignment: .leading, spacing: 2) {
 						Text(entry.app.currentName)
 							.font(.system(.body, design: .rounded).weight(.semibold))
-							.foregroundStyle(.white)
+							.foregroundStyle(.primary)
 							.lineLimit(1)
 						Text(entry.app.currentDescription ?? entry.app.developer ?? entry.primary.sourceName)
 							.font(.footnote)
@@ -381,7 +381,7 @@ struct ODCategoryGrid: View {
 								.background(Circle().fill(Color.accentColor.opacity(0.12)))
 							Text(category.name)
 								.font(.system(.subheadline, design: .rounded).weight(.semibold))
-								.foregroundStyle(.white)
+								.foregroundStyle(.primary)
 								.lineLimit(1)
 							Spacer(minLength: 0)
 						}

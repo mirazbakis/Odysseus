@@ -34,6 +34,13 @@ struct TunnelView: View {
 			}
 			
 			Section {
+				if ODPairingController.isSupported {
+					NavigationLink {
+						ODPairDeviceView()
+					} label: {
+						Label(.localized("Pair This Device"), systemImage: "link")
+					}
+				}
 				Button(.localized("Import Pairing File"), systemImage: "square.and.arrow.down") {
 					_isImportingPairingPresenting = true
 				}

@@ -61,7 +61,7 @@ struct ODSettingsView: View {
 				VStack(spacing: 2) {
 					Text(verbatim: "Odysseus")
 						.font(.system(.title2, design: .rounded).weight(.bold))
-						.foregroundStyle(.white)
+						.foregroundStyle(.primary)
 					Text(verbatim: "An app by mbakis · \(Bundle.main.version)")
 						.font(.footnote)
 						.foregroundStyle(.secondary)

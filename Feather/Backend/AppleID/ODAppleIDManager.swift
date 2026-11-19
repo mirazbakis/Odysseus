@@ -66,9 +66,24 @@ enum ODAppleIDError: LocalizedError {
 	case noCertificate
 	case appIDLimit(String)
 	case cancelled
+	case signInPaused(Int)
+	case passwordOrAnisette
+	case locked
+	case rateLimited
+	case allServersFailed(String)
 
 	var errorDescription: String? {
 		switch self {
+		case .signInPaused(let minutes):
+			return .localized("Odysseus paused sign-ins for this Apple ID to help keep it from being locked. Try again in %@ min.", arguments: String(minutes))
+		case .passwordOrAnisette:
+			return .localized("Apple turned down the sign-in. Apple answers the same way for a wrong password and for anisette data it won't accept, so check your Apple ID and password, then pick a different anisette server in Settings → Apple ID. Too many failed tries can lock your account.")
+		case .locked:
+			return .localized("Apple says this Apple ID is locked. Unlock it at iforgot.apple.com, then sign in again.")
+		case .rateLimited:
+			return .localized("Apple is receiving too many requests from this account. Try again later.")
+		case .allServersFailed(let details):
+			return .localized("Apple ID sign-in failed with every anisette server Odysseus tried.\n\n%@", arguments: details)
 		case .notSignedIn:
 			return .localized("Sign in with your Apple ID in Settings → Apple ID first.")
 		case .sessionExpired:
@@ -103,11 +118,8 @@ final class ODAppleIDManager: ObservableObject {
 		static let anisetteBlob = "appleid.anisetteBlob"
 	}
 
-	static let anisetteServersKey = "Odysseus.anisetteServers"
 	static let rememberPasswordKey = "Odysseus.appleID.rememberPassword"
 	static let manualUDIDKey = "Odysseus.deviceUDID"
-	static let anisetteIdentifierKey = "Odysseus.anisetteIdentifier"
-	static let defaultAnisetteServer = "https://ani.sidestore.io"
 	static let xcodeVersion = "26.0 (26A242)"
 
 	@Published private(set) var account: ODAppleIDAccountInfo?
@@ -116,6 +128,14 @@ final class ODAppleIDManager: ObservableObject {
 	@Published var twoFactorPrompt: TwoFactorRequest?
 	@Published private(set) var isWorking = false
 	@Published var lastError: String?
+
+	/// Nested work (a silent re-sign-in during signing) shares one busy flag.
+	private var _workDepth = 0 {
+		didSet { isWorking = _workDepth > 0 }
+	}
+
+	private func _beginWork() { _workDepth += 1 }
+	private func _endWork() { _workDepth = max(0, _workDepth - 1) }
 
 	private var _twoFactorContinuation: CheckedContinuation<TwoFactorResponse, Error>?
 	private var _authSession: AuthSession?
@@ -139,39 +159,25 @@ final class ODAppleIDManager: ObservableObject {
 	}
 
 	// MARK: Anisette
-	var anisetteServers: [URL] {
-		let stored = UserDefaults.standard.string(forKey: Self.anisetteServersKey) ?? Self.defaultAnisetteServer
-		let urls = stored
-			.split(whereSeparator: { $0 == "\n" || $0 == "," })
-			.map { $0.trimmingCharacters(in: .whitespaces) }
-			.compactMap { URL(string: $0) }
-		return urls.isEmpty ? [URL(string: Self.defaultAnisetteServer)!] : urls
-	}
-
-	private var _anisetteIdentifier: UUID {
-		if let stored = UserDefaults.standard.string(forKey: Self.anisetteIdentifierKey), let uuid = UUID(uuidString: stored) {
-			return uuid
-		}
-		let uuid = UUID()
-		UserDefaults.standard.set(uuid.uuidString, forKey: Self.anisetteIdentifierKey)
-		return uuid
-	}
-
+	/// Anisette for portal calls. It must come from the server the session
+	/// was made with, because Apple ties the session to that machine identity.
 	private func _fetchAnisette() async throws -> AnisetteData {
-		let existingBlob = ODKeychain.data(for: Key.anisetteBlob)
-		let (data, newBlob) = try await AnisetteDataManager.shared.fetchAnisetteDataWithFailover(
-			servers: anisetteServers,
-			startIndex: 0,
-			identifier: _anisetteIdentifier,
-			existingAdiBlob: existingBlob,
-			headers: nil,
-			onError: nil,
-			onSuccess: nil
-		)
-		if let newBlob {
-			ODKeychain.set(newBlob, for: Key.anisetteBlob)
+		if let stored = UserDefaults.standard.string(forKey: ODAnisetteServers.sessionServerKey),
+		   let server = URL(string: stored) {
+			return try await ODAnisetteServers.fetch(from: server)
 		}
-		return data
+		let servers = await ODAnisetteServers.shared.signInList()
+		var lastError: Error = ODAppleIDError.notSignedIn
+		for server in servers {
+			do { return try await ODAnisetteServers.fetch(from: server) } catch { lastError = error }
+		}
+		throw lastError
+	}
+
+	/// Forgets every anisette identity (Settings → Apple ID → Reset Anisette Data).
+	func resetAnisette() {
+		ODAnisetteServers.resetProvisioning()
+		ODKeychain.set(nil, for: Key.anisetteBlob)
 	}
 
 	// MARK: Device UDID
@@ -180,6 +186,9 @@ final class ODAppleIDManager: ObservableObject {
 		if let manual = UserDefaults.standard.string(forKey: Self.manualUDIDKey)?.trimmingCharacters(in: .whitespacesAndNewlines),
 		   !manual.isEmpty {
 			return manual
+		}
+		if let paired = ODPairingController.pairedUDID {
+			return paired
 		}
 		let pairing = URL.documentsDirectory.appendingPathComponent("pairingFile.plist")
 		guard
@@ -197,29 +206,82 @@ final class ODAppleIDManager: ObservableObject {
 
 	// MARK: Sign in
 	func signIn(appleID: String, password: String, rememberPassword: Bool) async throws {
-		isWorking = true
+		_beginWork()
 		lastError = nil
-		defer { isWorking = false }
-
-		let anisette = try await _fetchAnisette()
+		defer { _endWork() }
 
 		let verification: DeveloperPortal.VerificationHandler = { request in
 			try await ODAppleIDManager.shared._askTwoFactor(request)
 		}
 
-		let authSession = try await _portal.authenticate(
-			appleID: appleID,
-			password: password,
-			anisetteData: anisette,
-			xcodeVersion: Self.xcodeVersion,
-			machinePassword: nil,
-			accountRepairHandler: DeveloperPortal.defaultAccountRepairHandler,
-			verificationHandler: verification
-		)
+		if let minutes = ODSignInPause.minutesLeft(appleID) {
+			throw ODAppleIDError.signInPaused(minutes)
+		}
+
+		// Try the healthy servers in order, moving on when Apple or the
+		// server refuses the anisette data (AltLoad's sign-in failover).
+		let servers = await ODAnisetteServers.shared.signInList()
+		var authSession: AuthSession?
+		var failures: [String] = []
+		var refused = false
+		for (index, server) in servers.enumerated() {
+			let isLast = index + 1 == servers.count
+			do {
+				let anisette = try await ODAnisetteServers.fetch(from: server)
+				authSession = try await _portal.authenticate(
+					appleID: appleID,
+					password: password,
+					anisetteData: anisette,
+					xcodeVersion: Self.xcodeVersion,
+					machinePassword: nil,
+					accountRepairHandler: DeveloperPortal.defaultAccountRepairHandler,
+					verificationHandler: verification
+				)
+				UserDefaults.standard.set(server.absoluteString, forKey: ODAnisetteServers.sessionServerKey)
+				ODSignInPause.clear()
+				break
+			} catch {
+				let host = server.host ?? server.absoluteString
+				Logger.misc.error("Apple ID sign-in with \(host) failed: \(error.localizedDescription)")
+				switch ODSignInFailure.classify(error) {
+				case .passwordOrAnisette:
+					refused = true
+					failures.append("\(host): \(error.localizedDescription)")
+					if isLast {
+						ODSignInPause.recordRejection(appleID, pauseNow: false)
+						throw ODAppleIDError.passwordOrAnisette
+					}
+				case .locked:
+					ODSignInPause.recordRejection(appleID, pauseNow: true)
+					throw ODAppleIDError.locked
+				case .rateLimited:
+					ODSignInPause.recordRejection(appleID, pauseNow: true)
+					throw ODAppleIDError.rateLimited
+				case .anisette where !isLast:
+					failures.append("\(host): \(error.localizedDescription)")
+				case .anisette, .other:
+					if refused { ODSignInPause.recordRejection(appleID, pauseNow: false) }
+					if failures.isEmpty { throw error }
+					failures.append("\(host): \(error.localizedDescription)")
+					throw ODAppleIDError.allServersFailed(failures.joined(separator: "\n"))
+				}
+			}
+		}
+		guard let authSession else {
+			throw ODAppleIDError.allServersFailed(failures.joined(separator: "\n"))
+		}
 
 		let teams = try await _portal.fetchTeams(for: authSession.account, session: authSession.session)
-		guard let team = teams.first(where: { $0.type == .free }) ?? teams.first else {
+		// Signing in again (an expired session) keeps the team you picked.
+		let previousTeamID = account?.appleID.caseInsensitiveCompare(authSession.account.appleID) == .orderedSame ? _team?.identifier : nil
+		guard let team = teams.first(where: { $0.identifier == previousTeamID })
+				?? teams.first(where: { $0.type == .free })
+				?? teams.first else {
 			throw DeveloperPortalError.noTeams
+		}
+		if let previousTeamID, team.identifier != previousTeamID {
+			// The old team is gone, so its certificate is too.
+			_clearCertificate()
 		}
 
 		_authSession = authSession
@@ -272,6 +334,7 @@ final class ODAppleIDManager: ObservableObject {
 		if !keepCertificate {
 			_clearCertificate()
 		}
+		UserDefaults.standard.removeObject(forKey: ODAnisetteServers.sessionServerKey)
 		AnisetteDataManager.shared.clearCache()
 	}
 
@@ -510,8 +573,8 @@ final class ODAppleIDManager: ObservableObject {
 		guard isSignedIn else { throw ODAppleIDError.notSignedIn }
 		guard let udid = deviceUDID else { throw ODAppleIDError.missingUDID }
 
-		isWorking = true
-		defer { isWorking = false }
+		_beginWork()
+		defer { _endWork() }
 
 		try await ensureCertificate()
 

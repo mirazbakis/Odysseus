@@ -13,13 +13,37 @@ import AltSourceKit
 // MARK: - Theme
 enum ODTheme {
 	/// Pure black.
-	static let midnight = Color(hex: "#000000")
+	static let midnight = _dynamic(dark: "#000000", light: "#F2F4F8")
 	/// Very dark navy for cards.
-	static let navy = Color(hex: "#060A14")
+	static let navy = _dynamic(dark: "#060A14", light: "#FFFFFF")
 	/// Raised chips, fields and rows.
-	static let navyRaised = Color(hex: "#0B1222")
+	static let navyRaised = _dynamic(dark: "#0B1222", light: "#E8EDF5")
 	/// Hairline borders on cards.
-	static let hairline = Color.white.opacity(0.06)
+	static let hairline = Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor.white.withAlphaComponent(0.06) : UIColor.black.withAlphaComponent(0.07) })
+	/// Text/icons placed on accent fills: black in dark, white in light.
+	static let onAccent = Color(UIColor { $0.userInterfaceStyle == .dark ? .black : .white })
+
+	private static func _dynamic(dark: String, light: String) -> Color {
+		Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(Color(hex: dark)) : UIColor(Color(hex: light)) })
+	}
+
+	/// Dynamic UIColor for a tint hex: unchanged in dark, darkened in light when too pale to read on white.
+	static func tintUIColor(hex: String) -> UIColor {
+		let base = UIColor(Color(hex: hex))
+		return UIColor { trait in
+			guard trait.userInterfaceStyle != .dark else { return base }
+			var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+			base.getRed(&r, green: &g, blue: &b, alpha: &a)
+			func lin(_ c: CGFloat) -> CGFloat { c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
+			let lum = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+			guard lum > 0.35 else { return base }
+			var h: CGFloat = 0, s: CGFloat = 0, v: CGFloat = 0
+			base.getHue(&h, saturation: &s, brightness: &v, alpha: &a)
+			return UIColor(hue: h, saturation: min(1, max(s, 0.35) + 0.3), brightness: v * 0.5, alpha: a)
+		}
+	}
+
+	static func tintColor(hex: String) -> Color { Color(tintUIColor(hex: hex)) }
 	/// Default accent: moonlight silver-blue.
 	static let moonlightHex = "#B8CCF0"
 
@@ -27,7 +51,7 @@ enum ODTheme {
 	static let chipRadius: CGFloat = 14
 
 	static var accent: Color {
-		Color(hex: UserDefaults.standard.string(forKey: "Feather.userTintColor") ?? moonlightHex)
+		tintColor(hex: UserDefaults.standard.string(forKey: "Feather.userTintColor") ?? moonlightHex)
 	}
 
 	/// The brand gradient used behind the logo.
@@ -121,7 +145,7 @@ extension View {
 				Capsule()
 					.fill(.ultraThinMaterial)
 					.overlay(Capsule().fill((tint ?? .clear).opacity(0.35)))
-					.overlay(Capsule().strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
+					.overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
 			)
 		}
 	}
@@ -135,7 +159,7 @@ extension View {
 			self.background(
 				Circle()
 					.fill(.ultraThinMaterial)
-					.overlay(Circle().strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
+					.overlay(Circle().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
 			)
 		}
 	}
@@ -149,7 +173,7 @@ struct ODProminentButtonStyle: ButtonStyle {
 	func makeBody(configuration: Configuration) -> some View {
 		configuration.label
 			.font(.system(.headline, design: .rounded).weight(.bold))
-			.foregroundStyle(isDestructive ? Color.white : Color.black)
+			.foregroundStyle(isDestructive ? Color.white : ODTheme.onAccent)
 			.frame(maxWidth: .infinity)
 			.padding(.vertical, 15)
 			.background(
@@ -169,7 +193,7 @@ struct ODCapsuleButtonStyle: ButtonStyle {
 	func makeBody(configuration: Configuration) -> some View {
 		configuration.label
 			.font(.system(.subheadline, design: .rounded).weight(.bold))
-			.foregroundStyle(filled ? Color.black : Color.accentColor)
+			.foregroundStyle(filled ? ODTheme.onAccent : Color.accentColor)
 			.padding(.horizontal, 20)
 			.padding(.vertical, 7)
 			.background(
@@ -239,7 +263,7 @@ struct ODSectionHeader: View {
 			VStack(alignment: .leading, spacing: 2) {
 				Text(title)
 					.font(.system(.title3, design: .rounded).weight(.bold))
-					.foregroundStyle(.white)
+					.foregroundStyle(.primary)
 				if let subtitle {
 					Text(subtitle)
 						.font(.footnote)
@@ -303,7 +327,7 @@ struct ODLogoView: View {
 			.clipShape(RoundedRectangle(cornerRadius: size * 0.2237, style: .continuous))
 			.overlay(
 				RoundedRectangle(cornerRadius: size * 0.2237, style: .continuous)
-					.strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+					.strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
 			)
 	}
 }

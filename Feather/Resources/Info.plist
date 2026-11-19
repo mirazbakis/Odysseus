@@ -95,10 +95,17 @@
 			</dict>
 		</dict>
 	</dict>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_remotepairing-pairable-host._tcp</string>
+		<string>_remotepairing._tcp</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Odysseus uses the camera to scan QR codes with source links.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Odysseus asks for Face ID before exporting your Apple ID certificate.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Odysseus uses the local network to pair with this device, so it can read the device's UDID and install apps.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

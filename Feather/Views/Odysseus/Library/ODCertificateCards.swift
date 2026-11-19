@@ -86,7 +86,7 @@ struct ODCertificateStatusCard: View {
 				VStack(alignment: .leading, spacing: 2) {
 					Text(certificate.nickname ?? _decoded?.Name ?? .localized("Certificate"))
 						.font(.system(.headline, design: .rounded).weight(.bold))
-						.foregroundStyle(.white)
+						.foregroundStyle(.primary)
 						.lineLimit(1)
 					Text(_decoded?.TeamName ?? .localized("Signing certificate"))
 						.font(.caption)
@@ -177,7 +177,7 @@ struct ODCertificateStatusCard: View {
 				VStack(alignment: .leading, spacing: 2) {
 					Text(.localized("No certificate"))
 						.font(.system(.headline, design: .rounded).weight(.bold))
-						.foregroundStyle(.white)
+						.foregroundStyle(.primary)
 					Text(.localized("Import your .p12 and .mobileprovision, or sign in with your Apple ID in Settings."))
 						.font(.caption)
 						.foregroundStyle(.secondary)
@@ -210,7 +210,7 @@ struct ODAppleIDStatusCard: View {
 				VStack(alignment: .leading, spacing: 2) {
 					Text(_manager.account?.displayName ?? .localized("Apple ID"))
 						.font(.system(.headline, design: .rounded).weight(.bold))
-						.foregroundStyle(.white)
+						.foregroundStyle(.primary)
 						.lineLimit(1)
 					Text(verbatim: "\(_manager.account?.teamName ?? "") · \(_manager.account?.teamIsFree == true ? String.localized("Free") : String.localized("Paid"))")
 						.font(.caption)
@@ -325,7 +325,7 @@ struct ODOCSPResultRows: View {
 		}
 	}
 
-	private func _row(_ title: String, _ value: String, color: Color = .white) -> some View {
+	private func _row(_ title: String, _ value: String, color: Color = .primary) -> some View {
 		HStack(alignment: .top) {
 			Text(title).foregroundStyle(.secondary)
 			Spacer(minLength: 16)

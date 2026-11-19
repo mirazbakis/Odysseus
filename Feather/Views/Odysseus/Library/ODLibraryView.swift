@@ -231,7 +231,7 @@ struct ODLibraryView: View {
 			VStack(alignment: .leading, spacing: 3) {
 				Text(app.name ?? .localized("Unknown"))
 					.font(.system(.body, design: .rounded).weight(.semibold))
-					.foregroundStyle(.white)
+					.foregroundStyle(.primary)
 					.lineLimit(1)
 				Text(verbatim: [app.version, app.identifier].compactMap { $0 }.joined(separator: " · "))
 					.font(.caption)
